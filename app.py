@@ -2,35 +2,43 @@ import os
 import sys
 import time
 import subprocess
+import platform
 
-# Adiciona a pasta src ao path para que o pacote 'etl_olx' seja encontrado
+# Adiciona a pasta src ao path
 sys.path.insert(0, os.path.abspath("src"))
 
 # Define o módulo de configurações do Scrapy
 os.environ['SCRAPY_SETTINGS_MODULE'] = 'etl_olx.settings'
 
-# Caminho completo para o executável scrapy no ambiente virtual
-SCRAPY_EXECUTABLE = os.path.join(
-    os.path.abspath(".venv"), "Scripts", "scrapy.exe")
+# Detecta o sistema operacional
+if platform.system() == "Windows":
+    SCRAPY_EXECUTABLE = os.path.join(
+        os.path.abspath(".venv"), "Scripts", "scrapy.exe")
+else:
+    # Usa o caminho do Poetry no Linux
+    SCRAPY_EXECUTABLE = os.path.join(
+        os.environ["VIRTUAL_ENV"], "bin", "scrapy")
 
 contador = 1
 while True:
     try:
         print(f"\nExecução {contador} iniciada...")
-        # Define o PYTHONPATH para incluir o diretório raiz do projeto e o diretório src
-        env = os.environ.copy()
-        env["PYTHONPATH"] = f"{os.path.abspath('.')};{os.path.abspath('src')}"
-        # Adiciona o ambiente virtual ao PATH
-        env["PATH"] += f";{os.path.abspath('.venv/Scripts')}"
 
-        # Executa o comando scrapy crawl usando o caminho completo do executável
+        env = os.environ.copy()
+        path_sep = ";" if platform.system() == "Windows" else ":"
+        env["PYTHONPATH"] = f"{os.path.abspath('.')}{path_sep}{os.path.abspath('src')}"
+
+        # Adiciona o bin do venv ao PATH
+        if platform.system() == "Windows":
+            env["PATH"] += f";{os.path.abspath('.venv/Scripts')}"
+        else:
+            env["PATH"] += f":{os.path.join(os.environ['VIRTUAL_ENV'], 'bin')}"
+
         subprocess.run([SCRAPY_EXECUTABLE, "crawl", "olx_car"],
                        check=True, env=env)
     except subprocess.CalledProcessError as e:
-        # Captura erros do subprocesso
         print(f"Erro ao executar o Scrapy: {e}")
     except Exception as e:
-        # Captura outros erros
         print(f"Erro inesperado: {e}")
 
     # Aguarda 10 minutos antes da próxima execução
