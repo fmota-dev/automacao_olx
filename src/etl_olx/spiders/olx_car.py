@@ -31,22 +31,24 @@ class OlxCarSpider(scrapy.Spider):
         super().__init__(*args, **kwargs)
         self.driver = webdriver.Chrome(options=self.options)
 
-        ROOT_DIR = os.path.abspath(os.path.join(
-            os.path.dirname(__file__), "../../../"))
-        self.seen_file = os.path.join(ROOT_DIR, "data", "seen_ads.json")
+        self.seen_file = '/data/seen_ads.json'
 
         self.seen_ads = self._load_seen_ads()
 
     def _load_seen_ads(self):
+        self.logger.info("Loading seen ads...")
         if os.path.exists(self.seen_file):
             with open(self.seen_file, 'r') as f:
-                return json.load(f)
+                seen_ads = json.load(f)
+                self.logger.info(f"Loaded {len(seen_ads)} seen ads.")
+                return seen_ads
         return {}
 
     def _save_seen_ads(self):
         os.makedirs(os.path.dirname(self.seen_file), exist_ok=True)
         with open(self.seen_file, 'w') as f:
             json.dump(self.seen_ads, f)
+        self.logger.info(f"Saved {len(self.seen_ads)} seen ads.")
 
     def start_requests(self):
         for url in self.start_urls:
