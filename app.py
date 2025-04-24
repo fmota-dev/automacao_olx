@@ -4,6 +4,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
+import pytz  # Biblioteca para fuso horário
 
 # Adiciona a pasta src ao path
 sys.path.insert(0, os.path.abspath("src"))
@@ -19,6 +20,9 @@ else:
         SCRAPY_EXECUTABLE = os.path.join(os.environ["VIRTUAL_ENV"], "bin", "scrapy")
     else:
         SCRAPY_EXECUTABLE = "/usr/local/bin/scrapy"
+
+# Define o fuso horário desejado (exemplo: São Paulo)
+timezone = pytz.timezone("America/Sao_Paulo")
 
 while True:
     try:
@@ -39,8 +43,10 @@ while True:
     except Exception as e:
         print(f"⚠️ Erro inesperado: {e}", flush=True)
 
-    # Calcula a hora da próxima execução
-    proxima_execucao = datetime.now() + timedelta(seconds=600)  # 10 minutos de espera
+    # Calcula a hora da próxima execução considerando o fuso horário
+    proxima_execucao = datetime.now(timezone) + timedelta(
+        seconds=600
+    )  # 10 minutos de espera
 
     # Aguarda 10 minutos (600 segundos)
     print("⏳ Aguardando 10 minutos para a próxima execução...", flush=True)
