@@ -56,7 +56,7 @@ class OlxCarSpider(scrapy.Spider):
         if new_ads_count == 0:
             print("🔴 Nenhum anúncio novo encontrado.")
         else:
-            print(f"✅ {new_ads_count} novos anúncios encontrados e salvos.")
+            print("✅ Anúncios encontrados e salvos com sucesso.")
 
     def parse(self, response):
         titles = response.css("h2.olx-adcard__title::text").getall()
