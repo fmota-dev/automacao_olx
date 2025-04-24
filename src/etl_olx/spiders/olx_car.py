@@ -1,6 +1,3 @@
-import json
-import os
-
 import scrapy
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -8,7 +5,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
-from src.etl_olx.utils.email_utils import send_email
+from src.etl_olx.utils.email_utils import send_ad_email
+from src.etl_olx.utils.db import ad_exists, save_ad, create_table_if_needed
 
 
 class OlxCarSpider(scrapy.Spider):
@@ -16,7 +14,7 @@ class OlxCarSpider(scrapy.Spider):
     allowed_domains = ["www.olx.com.br"]
     start_urls = [
         "https://www.olx.com.br/autos-e-pecas/carros-vans-e-utilitarios/estado-rn?ps=20000&pe=40000&q=honda%20civic&rs=2006&re=2010",
-        "https://www.olx.com.br/autos-e-pecas/carros-vans-e-utilitarios/estado-rn?q=gol+g5+1.6&o=1",
+        "https://www.olx.com.br/autos-e-pecas/carros-vans-e-utilitarios/estado-rn?ps=20000&pe=30000&q=gol%201.6&rs=2009&re=2012",
     ]
 
     options = Options()
@@ -31,58 +29,55 @@ class OlxCarSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.driver = webdriver.Chrome(options=self.options)
-
-        self.seen_file = "/data/seen_ads.json"
-
-        self.seen_ads = self._load_seen_ads()
-
-    def _load_seen_ads(self):
-        self.logger.info("Loading seen ads...")
-        if os.path.exists(self.seen_file):
-            with open(self.seen_file, "r") as f:
-                seen_ads = json.load(f)
-                self.logger.info(f"Loaded {len(seen_ads)} seen ads.")
-                return seen_ads
-        return {}
-
-    def _save_seen_ads(self):
-        os.makedirs(os.path.dirname(self.seen_file), exist_ok=True)
-        with open(self.seen_file, "w") as f:
-            json.dump(self.seen_ads, f)
-        self.logger.info(f"Saved {len(self.seen_ads)} seen ads.")
+        create_table_if_needed()
 
     def start_requests(self):
+        new_ads_count = 0  # Variável para contar os anúncios novos
+
         for url in self.start_urls:
             try:
                 self.driver.get(url)
-                WebDriverWait(self.driver, 5).until(
+                WebDriverWait(self.driver, 10).until(
                     EC.presence_of_element_located(
-                        (By.CSS_SELECTOR, "h2.AdCard_title__5bFRP")
+                        (By.CSS_SELECTOR, "section.olx-adcard")
                     )
                 )
-
                 html = self.driver.page_source
                 response = scrapy.http.HtmlResponse(
                     url=self.driver.current_url, body=html, encoding="utf-8"
                 )
-                yield from self.parse(response)
+                new_ads_count += yield from self.parse(
+                    response
+                )  # A contagem é atualizada a cada parse
             except Exception as e:
-                self.logger.error(f"Error processing {url}: {e}")
-            finally:
-                self._save_seen_ads()
+                print(f"❌ [ERRO] Erro ao processar {url}: {e}")
+
+        # Verifica no final de todos os URLs processados
+        if new_ads_count == 0:
+            print("🔴 Nenhum anúncio novo encontrado.")
+        else:
+            print(f"✅ {new_ads_count} novos anúncios encontrados e salvos.")
 
     def parse(self, response):
-        titles = response.css("h2.AdCard_title__5bFRP::text").getall()
-        prices = response.css("h3.AdCard_price___yY62::text").getall()
-        links = response.css("a.AdCard_link__4c7W6::attr(href)").getall()
+        titles = response.css("h2.olx-adcard__title::text").getall()
+        prices = response.css("h3.olx-adcard__price::text").getall()
+        links = response.css("a.olx-adcard__link::attr(href)").getall()
+
+        new_ads_count = 0  # Contador de novos anúncios para esta página
 
         for title, price, link in zip(titles, prices, links):
-            unique_id = f"{title} - {price} - {link}"
-            if unique_id not in self.seen_ads:
-                self.seen_ads[unique_id] = True
-                send_email(title, price, link)
-                yield {"title": title, "price": price, "link": link}
+            try:
+                if not ad_exists(link):
+                    save_ad(title, price, link)
+                    send_ad_email(title, price, link)
+                    print(f"✨ Novo anúncio salvo: {title} - {price}")
+                    new_ads_count += 1
+                    yield {"title": title, "price": price, "link": link}
+            except Exception as e:
+                print(f"❌ [ERRO DB] {title} - {link}: {e}")
+
+        return new_ads_count  # Retorna a contagem dos anúncios novos encontrados
 
     def closed(self, reason):
-        # Garantir que o driver será fechado ao final
         self.driver.quit()
+        print("🔵 Driver do Selenium fechado corretamente.")

@@ -3,7 +3,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 
-def send_email(title, price, link):
+def send_ad_email(title, price, link):
     remetente = "fmota.web@gmail.com"
     destinatario = "filipe.motasl@outlook.com"
     senha = "zdar nmds rgny mqqk"
