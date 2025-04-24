@@ -43,7 +43,10 @@ while True:
     proxima_execucao = datetime.now() + timedelta(seconds=600)  # 10 minutos de espera
 
     # Aguarda 10 minutos (600 segundos)
-    print("⏳ Aguardando 10 minutos para a próxima execução...")
-    print(f"\n🕒 Próxima execução será às {proxima_execucao.strftime('%H:%M:%S')}")
+    print("⏳ Aguardando 10 minutos para a próxima execução...", flush=True)
+    print(
+        f"\n🕒 Próxima execução será às {proxima_execucao.strftime('%H:%M:%S')}",
+        flush=True,
+    )
 
     time.sleep(600)
